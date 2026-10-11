@@ -1,5 +1,5 @@
 
-name: Build Android APK
+name: Build ORION APK
 
 on:
   workflow_dispatch:
@@ -27,10 +27,10 @@ jobs:
           ZIP_FILE=$(find . -maxdepth 1 -type f \
             -iname 'ORION*.zip' -print -quit)
 
-          if [ -z "$ZIP_FILE" ]; then
+          test -n "$ZIP_FILE" || {
             echo "ERROR: ORION ZIP not found."
             exit 1
-          fi
+          }
 
           mkdir -p source
           unzip -oq "$ZIP_FILE" -d source
@@ -39,21 +39,13 @@ jobs:
             \( -name settings.gradle.kts \
             -o -name settings.gradle \) -print -quit)
 
-          if [ -z "$SETTINGS" ]; then
+          test -n "$SETTINGS" || {
             echo "ERROR: Gradle settings file not found."
             exit 1
-          fi
+          }
 
           PROJECT_DIR="$(dirname "$SETTINGS")"
-
-          if [ ! -f "$PROJECT_DIR/build.gradle.kts" ] && \
-             [ ! -f "$PROJECT_DIR/build.gradle" ]; then
-            echo "ERROR: Root Gradle build file missing."
-            exit 1
-          fi
-
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Project: $PROJECT_DIR"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -61,38 +53,31 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Install modern Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
       - name: Prepare Gradle wrapper
         shell: bash
         run: |
           set -e
           cd "$PROJECT_DIR"
 
-          if [ -f gradlew ]; then
-            chmod +x gradlew
-          else
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq gradle
-            gradle wrapper
-            chmod +x gradlew
+          if [ ! -f gradlew ]; then
+            gradle wrapper --gradle-version 8.9
           fi
 
-      - name: Configure Android SDK
-        shell: bash
-        run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_HOME"
+          chmod +x gradlew
 
-          if [ ! -d "$ANDROID_HOME/platform-tools" ]; then
-            echo "Installing Android SDK components"
-            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
-              --licenses || true
-          fi
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
       - name: Build debug APK
         shell: bash
         run: |
-          set -e
           cd "$PROJECT_DIR"
+          ./gradlew wrapper --gradle-version 8.9
           ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
@@ -102,5 +87,6 @@ jobs:
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+
 
 
