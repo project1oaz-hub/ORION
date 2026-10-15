@@ -1,8 +1,5 @@
 name: Build EDITH APK
 
-# Works in two layouts:
-#  1) You uploaded the project files normally (settings.gradle.kts is in the repo root), or
-#  2) You uploaded EDITH.zip as-is without extracting it: this workflow unzips it for you.
 on:
   push:
     branches: [main, master]
@@ -26,7 +23,6 @@ jobs:
             if [ -z "$ZIP" ]; then
               echo "No project files and no .zip found in the repository root."; exit 1
             fi
-            echo "Unpacking $ZIP"
             mkdir -p _unzipped
             unzip -q "$ZIP" -d _unzipped
             FOUND=$(find _unzipped -name settings.gradle.kts | head -n 1)
@@ -38,6 +34,11 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+
+      - name: Install NDK and CMake (for on-device Whisper)
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;26.3.11579264" "cmake;3.22.1"
 
       - uses: gradle/actions/setup-gradle@v4
         with:
@@ -51,4 +52,3 @@ jobs:
         with:
           name: EDITH-apk
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
-
