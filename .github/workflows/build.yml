@@ -1,12 +1,8 @@
-name: Build EDITH APK
+name: Build Ivy APK
 
 on:
   push:
-    branches: [main, master]
   workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
   build:
@@ -14,41 +10,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Find the project (unzip EDITH.zip if needed)
-        run: |
-          if [ -f settings.gradle.kts ]; then
-            echo "PROJECT_DIR=." >> "$GITHUB_ENV"
-          else
-            ZIP=$(ls -1 *.zip 2>/dev/null | head -n 1)
-            if [ -z "$ZIP" ]; then
-              echo "No project files and no .zip found in the repository root."; exit 1
-            fi
-            mkdir -p _unzipped
-            unzip -q "$ZIP" -d _unzipped
-            FOUND=$(find _unzipped -name settings.gradle.kts | head -n 1)
-            if [ -z "$FOUND" ]; then echo "settings.gradle.kts not found inside $ZIP"; exit 1; fi
-            echo "PROJECT_DIR=$(dirname "$FOUND")" >> "$GITHUB_ENV"
-          fi
+      - name: Unzip source
+        run: unzip -q Ivy_source.zip
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: "17"
 
-      - name: Install NDK and CMake (for on-device Whisper)
-        run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;26.3.11579264" "cmake;3.22.1"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: 8.9
+          gradle-version: "8.9"
 
       - name: Build debug APK
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: gradle assembleDebug --no-daemon --stacktrace
+        working-directory: Ivy
+        run: gradle assembleDebug --stacktrace
 
       - uses: actions/upload-artifact@v4
         with:
-          name: EDITH-apk
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+          name: Ivy-debug-apk
+          path: Ivy/app/build/outputs/apk/debug/app-debug.apk
